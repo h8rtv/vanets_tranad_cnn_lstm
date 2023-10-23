@@ -123,7 +123,7 @@ def save_model(model, optimizer, scheduler, epoch, accuracy_list):
         'scheduler_state_dict': scheduler.state_dict(),
         'accuracy_list': accuracy_list}, file_path)
 
-def load_model(modelname, dims, device=None, parallel=False):
+def load_model(modelname, dims, device=None, parallel=False, n_training=None):
 	import src.models
 	model_class = getattr(src.models, modelname)
 	model = model_class(dims) #  .double()
@@ -134,7 +134,10 @@ def load_model(modelname, dims, device=None, parallel=False):
 	files = os.listdir(folder) if os.path.exists(folder) else None
 	if files:
 		files.sort(key=lambda x: os.path.getmtime(folder + x))
-		most_recent_checkpoint = files[-1]
+		if n_training is not None:
+			most_recent_checkpoint = files[n_training]
+		else:
+			most_recent_checkpoint = files[-1]
 		fname = folder + most_recent_checkpoint
 	else:
 		fname = folder + 'model.ckpt'
@@ -145,6 +148,7 @@ def load_model(modelname, dims, device=None, parallel=False):
 		model = p_model
 	if os.path.exists(fname) and (not args.retrain or args.test):
 		print(f"{color.GREEN}Loading pre-trained model: {model.name}{color.ENDC}")
+		print(f"{color.GREEN}File: {fname}{color.ENDC}")
 		checkpoint = torch.load(fname, map_location=device)
 		model.load_state_dict(checkpoint['model_state_dict'])
 		optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
@@ -441,14 +445,14 @@ if __name__ == '__main__':
 	if args.model in ['MERLIN']:
 		eval(f'run_{args.model.lower()}(test_loader, labels, args.dataset)')
 	dims = test.shape[-1]
-	model, optimizer, scheduler, epoch, accuracy_list = load_model(args.model, dims, device=exec_device, parallel=args.parallel)
-
-	## Prepare data
-	if 'VeReMi' not in args.dataset and (model.name in ['Attention', 'DAGMM', 'USAD', 'MSCRED', 'CAE_M', 'GDN', 'MTAD_GAT', 'MAD_GAN', 'AlladiCNNLSTM'] or 'TranAD' in model.name):
-		train = convert_to_windows(train, model)
-
-	n_trainings = args.n_train if not args.test else 1
+	n_trainings = args.n_train
 	for n_training in range(n_trainings):
+		model, optimizer, scheduler, epoch, accuracy_list = load_model(args.model, dims, device=exec_device, parallel=args.parallel, n_training=n_training)
+
+		## Prepare data
+		if n_training == 0 and 'VeReMi' not in args.dataset and (model.name in ['Attention', 'DAGMM', 'USAD', 'MSCRED', 'CAE_M', 'GDN', 'MTAD_GAT', 'MAD_GAN', 'AlladiCNNLSTM'] or 'TranAD' in model.name):
+			train = convert_to_windows(train, model)
+
 		### Training phase
 		if not args.test:
 			print(f'{color.HEADER}Training {args.model} on {args.dataset}{color.ENDC}')
