@@ -335,8 +335,9 @@ def backprop(epoch, model, data, optimizer, scheduler, device, training = True, 
 			loss = loss[:, data.shape[1]-feats:data.shape[1]].view(-1, feats)
 			return loss.detach().numpy(), y_pred.detach().numpy()
 	elif 'TranAD' in model.name:
-		l = nn.MSELoss(reduction = 'none')
-		bs = model.batch if training else 5000
+		# l = nn.MSELoss(reduction = 'none')
+		l = nn.MSELoss(reduction = 'mean' if training else 'none')
+		bs = model.batch if training else 2000
 		if 'VeReMiH5' in args.dataset:
 			dataset = HDF5Dataset(data, chunk_size=bs*100, device=device, less=args.less and training_data)
 		else:
@@ -382,8 +383,8 @@ def backprop(epoch, model, data, optimizer, scheduler, device, training = True, 
 			z = torch.cat(zs, 1)
 			return loss.detach().cpu().numpy(), z.detach().cpu().numpy()[0]
 	elif 'Alladi' in model.name:
-		l = nn.MSELoss(reduction = 'none')
-		bs = model.batch if training else 5000
+		l = nn.MSELoss(reduction = 'mean' if training else 'none')
+		bs = model.batch if training else 2000
 		if 'VeReMiH5' in args.dataset:
 			dataset = HDF5Dataset(data, chunk_size=bs*100, device=device, less=args.less and training)
 		else:
@@ -478,6 +479,7 @@ if __name__ == '__main__':
 
 		result, pred = eval(loss, labels, multi=True)
 		pprint(result)
+		save_results(epoch, df, result)	
 		continue
 		### Scores
 		df = pd.DataFrame()

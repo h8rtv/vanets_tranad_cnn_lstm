@@ -494,7 +494,7 @@ class TranAD(nn.Module):
 		super(TranAD, self).__init__()
 		self.name = 'TranAD'
 		self.lr = lr
-		self.batch = 2048
+		self.batch = 512
 		self.n_feats = feats
 		self.n_window = 20
 		self.n_window_start = self.n_window
@@ -502,11 +502,11 @@ class TranAD(nn.Module):
 
 
 		self.pos_encoder = PositionalEncoding(2 * feats, 0.1, self.n_window)
-		encoder_layers = TransformerEncoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=128, dropout=0.1)
+		encoder_layers = TransformerEncoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=512, dropout=0.1)
 		self.transformer_encoder = TransformerEncoder(encoder_layers, 1)
-		decoder_layers1 = TransformerDecoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=128, dropout=0.1)
+		decoder_layers1 = TransformerDecoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=512, dropout=0.1)
 		self.transformer_decoder1 = TransformerDecoder(decoder_layers1, 1)
-		decoder_layers2 = TransformerDecoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=128, dropout=0.1)
+		decoder_layers2 = TransformerDecoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=512, dropout=0.1)
 		self.transformer_decoder2 = TransformerDecoder(decoder_layers2, 1)
 		self.fcn = nn.Sequential(nn.Linear(2 * feats, feats), nn.Sigmoid())
 
@@ -547,10 +547,11 @@ class AlladiCNNLSTM(nn.Module):
 		self.lstm = nn.LSTM(20, self.n_hidden, self.n_layers, batch_first=True)
 
 		# Fully connected layer
-        # self.fc = nn.Sequential(nn.Linear(20 * self.n_hidden, self.n_feats), nn.Sigmoid())
+		# self.fc = nn.Sequential(nn.Linear(self.n_window * self.n_hidden, self.n_window * self.n_feats), nn.Sigmoid())
 		self.fc = nn.Sequential(nn.Linear(self.n_hidden, self.n_feats), nn.Sigmoid())
 
 	def forward(self, src):
+		# batch_size = src.shape[1]
 		# Forward pass through CNN
 		src = src.permute(1, 2, 0)
 		src = self.cnn(src)
@@ -558,9 +559,12 @@ class AlladiCNNLSTM(nn.Module):
 
 		# Forward pass through LSTM
 		out, _ = self.lstm(src)
+		# out = out.reshape(batch_size, -1)
 
 		# Decode the hidden state for each time step
 		out = self.fc(out)
+
+		# out = out.reshape(batch_size, self.n_window, -1)
 
 		out = out.permute(1, 0, 2)
 		return out

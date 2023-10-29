@@ -1,7 +1,9 @@
+import os
+from src.parser import args
 import numpy as np
-from sklearn.metrics import f1_score, roc_auc_score, precision_recall_curve
+from sklearn.metrics import roc_auc_score, precision_recall_curve
+import matplotlib.pyplot as plt
 from src.pot import calc_point2point
-from tqdm import tqdm
 
 
 # not used
@@ -30,9 +32,23 @@ def thresholding_algorithm(test, reconstructed, labels):
     return threshold
 
 
-def find_optimal_threshold(mean_score, labels):
-    precision, recall, thresholds = precision_recall_curve(labels > 0, mean_score)
+def plot_pr_curve(precision, recall):
+    folder = f'plots/{args.model}_{args.dataset}/'
+    os.makedirs(folder, exist_ok=True)
+    plt.plot(recall, precision, marker='.')
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.title('Precision-Recall Curve')
+    plt.savefig(f'{folder}pr_curve.png')
+
+
+def find_optimal_threshold(mean_score, labels, plot=True):
+    precision, recall, thresholds = precision_recall_curve(
+        labels > 0, mean_score)
     f1_scores = 2*recall*precision/(recall+precision)
+
+    if plot:
+        plot_pr_curve(precision, recall)
 
     best_threshold = thresholds[np.argmax(f1_scores)]
     best_f1 = np.max(f1_scores)
@@ -47,6 +63,9 @@ def eval(score, label, multi=False):
 
     mean_score = np.mean(score, axis=(0, 2))
     roc_score = roc_auc_score(label > 0, mean_score)
+    precision, recall, thresholds = precision_recall_curve(
+        label > 0, mean_score)
+
     threshold, f1 = find_optimal_threshold(mean_score, label)
     print(f'Best f1: {f1}, Thresh: {threshold}, ROC: {roc_score}')
 
