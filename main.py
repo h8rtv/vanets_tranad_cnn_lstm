@@ -477,12 +477,12 @@ if __name__ == '__main__':
 		print(f'{color.HEADER}Testing {args.model} on {args.dataset}{color.ENDC}')
 		loss, y_pred = backprop(0, model, test, optimizer, scheduler, exec_device, training=False, training_data=False)
 
+		df = pd.DataFrame()
 		result, pred = eval(loss, labels, multi=True)
 		pprint(result)
 		save_results(epoch, df, result)	
 		continue
 		### Scores
-		df = pd.DataFrame()
 		# lossT, _ = backprop(0, model, train, optimizer, scheduler, exec_device, training=False, training_data=True)
 
 		preds = []
