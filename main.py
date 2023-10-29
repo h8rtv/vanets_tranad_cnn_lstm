@@ -336,7 +336,7 @@ def backprop(epoch, model, data, optimizer, scheduler, device, training = True, 
 			return loss.detach().numpy(), y_pred.detach().numpy()
 	elif 'TranAD' in model.name:
 		l = nn.MSELoss(reduction = 'none')
-		bs = model.batch if training else 10000
+		bs = model.batch if training else 5000
 		if 'VeReMiH5' in args.dataset:
 			dataset = HDF5Dataset(data, chunk_size=bs*100, device=device, less=args.less and training_data)
 		else:
@@ -354,8 +354,8 @@ def backprop(epoch, model, data, optimizer, scheduler, device, training = True, 
 				z = model(window)
 				# old loss
 				# l1 = l(z, elem) if not isinstance(z, tuple) else (1 / n) * l(z[0], elem) + (1 - 1/n) * l(z[1], elem)
-				l1 = l(z, elem) if not isinstance(z, tuple) else (0.9 ** n) * l(z[0], elem) + (1 - 0.9 ** n) * l(z[1], elem)
-				l1 += 0 if not isinstance(z, tuple) or len(z) < 3 else  (0.9 ** n) * l(z[2], elem) - (1 - 0.9 ** n) * l(z[1], elem)
+				l1 = l(z, window) if not isinstance(z, tuple) else (0.9 ** n) * l(z[0], window) + (1 - 0.9 ** n) * l(z[1], window)
+				l1 += 0 if not isinstance(z, tuple) or len(z) < 3 else  (0.9 ** n) * l(z[2], window) - (1 - 0.9 ** n) * l(z[1], window)
 				if isinstance(z, tuple): z = z[1]
 				l1s.append(torch.mean(l1).item())
 				loss = torch.mean(l1)
@@ -374,8 +374,8 @@ def backprop(epoch, model, data, optimizer, scheduler, device, training = True, 
 				window = d.permute(1, 0, 2)
 				# elem = window[-1, :, :].view(1, local_bs, feats)
 				z = model(window)
-				if isinstance(z, tuple): z = z[1]
-				loss = l(z, elem)[0]
+				if isinstance(z, tuple): z = z[2]
+				loss = l(z, window)
 				zs.append(z.cpu().detach())
 				losses.append(loss.cpu().detach())	
 			loss = torch.cat(losses, 1)
@@ -478,7 +478,7 @@ if __name__ == '__main__':
 
 		result, pred = eval(loss, labels, multi=True)
 		pprint(result)
-		quit()
+		continue
 		### Scores
 		df = pd.DataFrame()
 		# lossT, _ = backprop(0, model, train, optimizer, scheduler, exec_device, training=False, training_data=True)
