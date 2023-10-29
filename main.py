@@ -11,6 +11,7 @@ from src.pot import *
 from src.utils import *
 from src.diagnosis import *
 from src.merlin import *
+from src.alladi import eval
 from sklearn.metrics import accuracy_score
 import torch
 from torch.utils.data import Dataset, DataLoader, TensorDataset
@@ -347,11 +348,10 @@ def backprop(epoch, model, data, optimizer, scheduler, device, training = True, 
 		if training:
 			for d, _ in tqdm(dataloader):
 				d = d.to(device)
-                # pack padded sequence
 				local_bs = d.shape[0]
 				window = d.permute(1, 0, 2)
-				elem = window[-1, :, :].view(1, local_bs, feats)
-				z = model(window, elem)
+				# elem = window[-1, :, :].view(1, local_bs, feats)
+				z = model(window)
 				# old loss
 				# l1 = l(z, elem) if not isinstance(z, tuple) else (1 / n) * l(z[0], elem) + (1 - 1/n) * l(z[1], elem)
 				l1 = l(z, elem) if not isinstance(z, tuple) else (0.9 ** n) * l(z[0], elem) + (1 - 0.9 ** n) * l(z[1], elem)
@@ -372,18 +372,18 @@ def backprop(epoch, model, data, optimizer, scheduler, device, training = True, 
 				d = d.to(device)
 				local_bs = d.shape[0]
 				window = d.permute(1, 0, 2)
-				elem = window[-1, :, :].view(1, local_bs, feats)
-				z = model(window, elem)
+				# elem = window[-1, :, :].view(1, local_bs, feats)
+				z = model(window)
 				if isinstance(z, tuple): z = z[1]
 				loss = l(z, elem)[0]
 				zs.append(z.cpu().detach())
 				losses.append(loss.cpu().detach())	
-			loss = torch.cat(losses, 0)
+			loss = torch.cat(losses, 1)
 			z = torch.cat(zs, 1)
 			return loss.detach().cpu().numpy(), z.detach().cpu().numpy()[0]
 	elif 'Alladi' in model.name:
 		l = nn.MSELoss(reduction = 'none')
-		bs = model.batch if training else 10000
+		bs = model.batch if training else 5000
 		if 'VeReMiH5' in args.dataset:
 			dataset = HDF5Dataset(data, chunk_size=bs*100, device=device, less=args.less and training)
 		else:
@@ -397,9 +397,9 @@ def backprop(epoch, model, data, optimizer, scheduler, device, training = True, 
 				d = d.to(device)
 				local_bs = d.shape[0]
 				window = d.permute(1, 0, 2)
-				elem = window[-1, :, :].view(1, local_bs, feats)
+				# elem = window[-1, :, :].view(1, local_bs, feats)
 				z = model(window)
-				l1 = l(z, elem)
+				l1 = l(z, window)
 				l1s.append(torch.mean(l1).item())
 				loss = torch.mean(l1)
 				optimizer.zero_grad()
@@ -415,12 +415,12 @@ def backprop(epoch, model, data, optimizer, scheduler, device, training = True, 
 				d = d.to(device)
 				local_bs = d.shape[0]
 				window = d.permute(1, 0, 2)
-				elem = window[-1, :, :].view(1, local_bs, feats)
+				# elem = window[-1, :, :].view(1, local_bs, feats)
 				z = model(window)
-				loss = l(z, elem)[0]
+				loss = l(z, window)
 				zs.append(z.cpu().detach())
 				losses.append(loss.cpu().detach())
-			loss = torch.cat(losses, 0)
+			loss = torch.cat(losses, 1)
 			z = torch.cat(zs, 1)
 			return loss.detach().cpu().numpy(), z.detach().cpu().numpy()[0]
 	else:
@@ -470,15 +470,19 @@ if __name__ == '__main__':
 			if 'VeReMi' not in args.dataset and (model.name in ['Attention', 'DAGMM', 'USAD', 'MSCRED', 'CAE_M', 'GDN', 'MTAD_GAT', 'MAD_GAN', 'AlladiCNNLSTM'] or 'TranAD' in model.name): 
 				test = convert_to_windows(test, model, training=False)
 
+		print(np.unique(labels[:, 0])
 		### Testing phase
 		torch.zero_grad = True
 		model.eval()
 		print(f'{color.HEADER}Testing {args.model} on {args.dataset}{color.ENDC}')
 		loss, y_pred = backprop(0, model, test, optimizer, scheduler, exec_device, training=False, training_data=False)
 
+		result, pred = eval(loss, labels, multi=True)
+		pprint(result)
+		quit()
 		### Scores
 		df = pd.DataFrame()
-		lossT, _ = backprop(0, model, train, optimizer, scheduler, exec_device, training=False, training_data=True)
+		# lossT, _ = backprop(0, model, train, optimizer, scheduler, exec_device, training=False, training_data=True)
 
 		preds = []
 		threshs = []

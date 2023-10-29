@@ -488,6 +488,7 @@ class TranAD_SelfConditioning(nn.Module):
 		return x1, x2
 
 # Proposed Model + Self Conditioning + Adversarial + MAML (VLDB 22)
+# testing as AutoEncoder by h8rtv
 class TranAD(nn.Module):
 	def __init__(self, feats):
 		super(TranAD, self).__init__()
@@ -495,9 +496,9 @@ class TranAD(nn.Module):
 		self.lr = lr
 		self.batch = 2048
 		self.n_feats = feats
-		self.n_window = 10
+		self.n_window = 20
 		self.n_window_start = self.n_window
-		self.n_window_slide = 1
+		self.n_window_slide = 10
 
 
 		self.pos_encoder = PositionalEncoding(2 * feats, 0.1, self.n_window)
@@ -509,39 +510,38 @@ class TranAD(nn.Module):
 		self.transformer_decoder2 = TransformerDecoder(decoder_layers2, 1)
 		self.fcn = nn.Sequential(nn.Linear(2 * feats, feats), nn.Sigmoid())
 
-	def encode(self, src, c, tgt):
+	def encode(self, src, c):
 		src = torch.cat((src, c), dim=2)
 		src = src * math.sqrt(self.n_feats)
 		src = self.pos_encoder(src)
 		memory = self.transformer_encoder(src)
-		tgt = tgt.repeat(1, 1, 2)
-		return tgt, memory
+		return src, memory
 
-	def forward(self, src, tgt):
+	def forward(self, src):
 		# Phase 1 - Without anomaly scores
 		c = torch.zeros_like(src)
-		x1 = self.fcn(self.transformer_decoder1(*self.encode(src, c, tgt)))
-		x12 = self.fcn(self.transformer_decoder2(*self.encode(src, c, tgt)))
+		x1 = self.fcn(self.transformer_decoder1(*self.encode(src, c)))
+		x12 = self.fcn(self.transformer_decoder2(*self.encode(src, c)))
 		# Phase 2 - With anomaly scores
 		c = (x1 - src) ** 2
-		x2 = self.fcn(self.transformer_decoder2(*self.encode(src, c, tgt)))
+		x2 = self.fcn(self.transformer_decoder2(*self.encode(src, c)))
 		return x1, x2, x12
 
 class AlladiCNNLSTM(nn.Module):
 	def __init__(self, feats):
 		super(AlladiCNNLSTM, self).__init__()
 		self.name = 'AlladiCNNLSTM'
-		self.batch = 2048
+		self.batch = 512
 		self.lr = lr
 		self.n_feats = feats
-		self.n_window = 10
-		self.n_window_slide = 1
+		self.n_window = 20
+		self.n_window_slide = 10
 		self.n_window_start = self.n_window
 		self.n_hidden = 256
 		self.n_layers = 4
 
 		# Define the CNN layers
-		self.cnn = nn.Conv1d(feats, 20, kernel_size=3)
+		self.cnn = nn.Conv1d(feats, 20, kernel_size=1)
 
 		# Define the LSTM layers
 		self.lstm = nn.LSTM(20, self.n_hidden, self.n_layers, batch_first=True)
@@ -559,9 +559,8 @@ class AlladiCNNLSTM(nn.Module):
 		# Forward pass through LSTM
 		out, _ = self.lstm(src)
 
-        # out = out.reshape(-1, out.shape[1] * out.shape[2])
-		out = out[:, -1]
-		# Decode the hidden state of the last time step
+		# Decode the hidden state for each time step
 		out = self.fc(out)
 
-		return out.unsqueeze(0)
+		out = out.permute(1, 0, 2)
+		return out
