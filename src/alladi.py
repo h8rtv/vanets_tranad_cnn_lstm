@@ -1,5 +1,5 @@
 import numpy as np
-from sklearn.metrics import f1_score, roc_auc_score
+from sklearn.metrics import f1_score, roc_auc_score, precision_recall_curve
 from src.pot import calc_point2point
 from tqdm import tqdm
 
@@ -31,21 +31,11 @@ def thresholding_algorithm(test, reconstructed, labels):
 
 
 def find_optimal_threshold(mean_score, labels):
-    # Create an array of potential threshold values
-    thresholds = np.arange(0.0001, 0.004, 0.00001)
+    precision, recall, thresholds = precision_recall_curve(labels > 0, mean_score)
+    f1_scores = 2*recall*precision/(recall+precision)
 
-    best_f1 = 0
-    best_threshold = 0
-
-    for threshold in tqdm(thresholds):
-        preds = mean_score > threshold
-        actual = labels > 0
-
-        current_f1 = f1_score(actual, preds)
-
-        if current_f1 > best_f1:
-            best_f1 = current_f1
-            best_threshold = threshold
+    best_threshold = thresholds[np.argmax(f1_scores)]
+    best_f1 = np.max(f1_scores)
 
     return best_threshold, best_f1
 
