@@ -470,7 +470,6 @@ if __name__ == '__main__':
 			if 'VeReMi' not in args.dataset and (model.name in ['Attention', 'DAGMM', 'USAD', 'MSCRED', 'CAE_M', 'GDN', 'MTAD_GAT', 'MAD_GAN', 'AlladiCNNLSTM'] or 'TranAD' in model.name): 
 				test = convert_to_windows(test, model, training=False)
 
-		print(np.unique(labels[:, 0])
 		### Testing phase
 		torch.zero_grad = True
 		model.eval()
