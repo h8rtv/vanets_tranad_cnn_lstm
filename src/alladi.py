@@ -1,5 +1,5 @@
 import numpy as np
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, roc_auc_score
 from src.pot import calc_point2point
 from tqdm import tqdm
 
@@ -56,8 +56,9 @@ def eval(score, label, multi=False):
         label = label[:, 0]
 
     mean_score = np.mean(score, axis=(0, 2))
+    roc_score = roc_auc_score(label > 0, mean_score)
     threshold, f1 = find_optimal_threshold(mean_score, label)
-    print(f'Best f1: {f1}, Thresh: {threshold}')
+    print(f'Best f1: {f1}, Thresh: {threshold}, ROC: {roc_score}')
 
     preds = mean_score > threshold
 
