@@ -356,15 +356,15 @@ class TranAD_Basic(nn.Module):
         super(TranAD_Basic, self).__init__()
         self.name = 'TranAD_Basic'
         self.lr = lr
-        self.batch = 128
+        self.batch = 2048
         self.n_feats = feats
         self.n_window = 10
         self.n = self.n_feats * self.n_window
         self.pos_encoder = PositionalEncoding(feats, 0.1, self.n_window)
         encoder_layers = TransformerEncoderLayer(d_model=feats, nhead=feats, dim_feedforward=16, dropout=0.1)
-        self.transformer_encoder = TransformerEncoder(encoder_layers, 1)
+        self.transformer_encoder = TransformerEncoder(encoder_layers, 4)
         decoder_layers = TransformerDecoderLayer(d_model=feats, nhead=feats, dim_feedforward=16, dropout=0.1)
-        self.transformer_decoder = TransformerDecoder(decoder_layers, 1)
+        self.transformer_decoder = TransformerDecoder(decoder_layers, 4)
         self.fcn = nn.Sigmoid()
 
     def forward(self, src, tgt):
@@ -381,9 +381,9 @@ class TranAD_Transformer(nn.Module):
         super(TranAD_Transformer, self).__init__()
         self.name = 'TranAD_Transformer'
         self.lr = lr
-        self.batch = 128
+        self.batch = 2048
         self.n_feats = feats
-        self.n_hidden = 8
+        self.n_hidden = 128
         self.n_window = 10
         self.n = 2 * self.n_feats * self.n_window
         self.transformer_encoder = nn.Sequential(
@@ -499,34 +499,34 @@ class TranAD(nn.Module):
         self.n_window_start = self.n_window
         self.n_window_slide = 1
 
-        self.causal_mask = torch.tril(torch.ones(2 * self.n_feats, 2 * self.n_feats))
-
         self.pos_encoder = PositionalEncoding(2 * feats, 0.1, self.n_window)
-        encoder_layers = TransformerEncoderLayer(d_model=2 * feats, nhead=2 * feats, dim_feedforward=1024, dropout=0.1)
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, 1)
-        decoder_layers1 = TransformerDecoderLayer(d_model=2 * feats, nhead=2 * feats, dim_feedforward=1024, dropout=0.1)
-        self.transformer_decoder1 = nn.TransformerDecoder(decoder_layers1, 1)
-        decoder_layers2 = TransformerDecoderLayer(d_model=2 * feats, nhead=2 * feats, dim_feedforward=1024, dropout=0.1)
-        self.transformer_decoder2 = nn.TransformerDecoder(decoder_layers2, 1)
+        encoder_layers = TransformerEncoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=16, dropout=0.1)
+        self.transformer_encoder = TransformerEncoder(encoder_layers, 1)
+        decoder_layers1 = TransformerDecoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=16, dropout=0.1)
+        self.transformer_decoder1 = TransformerDecoder(decoder_layers1, 1)
+        decoder_layers2 = TransformerDecoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=16, dropout=0.1)
+        self.transformer_decoder2 = TransformerDecoder(decoder_layers2, 1)
         self.fcn = nn.Sequential(nn.Linear(2 * feats, feats), nn.Sigmoid())
 
     def encode(self, src, c, tgt):
         src = torch.cat((src, c), dim=2)
         src = src * math.sqrt(self.n_feats)
         src = self.pos_encoder(src)
-        memory = self.transformer_encoder(src, mask=self.causal_mask)
-        tgt = tgt.repeat(1, 1, 2)
-        return tgt, memory
+        memory = self.transformer_encoder(src)
+        #tgt = tgt.repeat(1, 1, 2)
+        return src, memory
 
     def forward(self, src, tgt):
         # Phase 1 - Without anomaly scores
         c = torch.zeros_like(src)
-        x1 = self.fcn(self.transformer_decoder1(*self.encode(src, c, tgt)))
-        x12 = self.fcn(self.transformer_decoder2(*self.encode(src, c, tgt)))
+        x1 = self.fcn(self.transformer_decoder1(*self.encode(src, c, tgt)))#, memory_mask=mask))
+        x1 = x1[-1].unsqueeze(0)
+
         # Phase 2 - With anomaly scores
         c = (x1 - src) ** 2
-        x2 = self.fcn(self.transformer_decoder2(*self.encode(src, c, tgt)))
-        return x1, x2, x12
+        x2 = self.fcn(self.transformer_decoder2(*self.encode(src, c, tgt)))#, memory_mask=mask))
+        x2 = x2[-1].unsqueeze(0)
+        return x1, x2
 
 class AlladiCNNLSTM(nn.Module):
     def __init__(self, feats):
