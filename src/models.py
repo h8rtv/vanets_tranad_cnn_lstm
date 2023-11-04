@@ -499,12 +499,12 @@ class TranAD(nn.Module):
         self.n_window_start = self.n_window
         self.n_window_slide = 1
 
-        self.pos_encoder = PositionalEncoding(2 * feats, 0.1, self.n_window)
-        encoder_layers = TransformerEncoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=16, dropout=0.1)
-        self.transformer_encoder = TransformerEncoder(encoder_layers, 1)
-        decoder_layers1 = TransformerDecoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=16, dropout=0.1)
+        self.pos_encoder = PositionalEncoding(2 * feats, 0, self.n_window)
+        encoder_layers = TransformerEncoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=512)
+        self.transformer_encoder = TransformerEncoder(encoder_layers, 2)
+        decoder_layers1 = TransformerDecoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=256)
         self.transformer_decoder1 = TransformerDecoder(decoder_layers1, 1)
-        decoder_layers2 = TransformerDecoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=16, dropout=0.1)
+        decoder_layers2 = TransformerDecoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=256)
         self.transformer_decoder2 = TransformerDecoder(decoder_layers2, 1)
         self.fcn = nn.Sequential(nn.Linear(2 * feats, feats), nn.Sigmoid())
 
@@ -512,20 +512,20 @@ class TranAD(nn.Module):
         src = torch.cat((src, c), dim=2)
         src = src * math.sqrt(self.n_feats)
         src = self.pos_encoder(src)
-        memory = self.transformer_encoder(src)
-        #tgt = tgt.repeat(1, 1, 2)
-        return src, memory
+        #mask = torch.triu(torch.ones((10, 10), device=src.device, dtype=torch.bool), diagonal=1) == 1
+        memory = self.transformer_encoder(src)#, mask=mask)
+        tgt = tgt.repeat(1, 1, 2)
+        return tgt, memory
 
     def forward(self, src, tgt):
         # Phase 1 - Without anomaly scores
         c = torch.zeros_like(src)
-        x1 = self.fcn(self.transformer_decoder1(*self.encode(src, c, tgt)))#, memory_mask=mask))
-        x1 = x1[-1].unsqueeze(0)
+        x1 = self.fcn(self.transformer_decoder1(*self.encode(src, c, tgt)))
 
         # Phase 2 - With anomaly scores
         c = (x1 - src) ** 2
-        x2 = self.fcn(self.transformer_decoder2(*self.encode(src, c, tgt)))#, memory_mask=mask))
-        x2 = x2[-1].unsqueeze(0)
+        x2 = self.fcn(self.transformer_decoder2(*self.encode(src, c, tgt)))
+
         return x1, x2
 
 class AlladiCNNLSTM(nn.Module):
