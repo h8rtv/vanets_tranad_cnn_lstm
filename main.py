@@ -445,6 +445,8 @@ if __name__ == '__main__':
 		eval(f'run_{args.model.lower()}(test_loader, labels, args.dataset)')
 	dims = test.shape[-1]
 	model, optimizer, scheduler, epoch, accuracy_list = load_model(args.model, dims, device=exec_device, parallel=args.parallel)
+	pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+	print('Number of trainable parameters', pytorch_total_params)
 
 	## Prepare data
 	if 'VeReMi' not in args.dataset and (model.name in ['Attention', 'DAGMM', 'USAD', 'MSCRED', 'CAE_M', 'GDN', 'MTAD_GAT', 'MAD_GAN', 'AlladiCNNLSTM'] or 'TranAD' in model.name):
